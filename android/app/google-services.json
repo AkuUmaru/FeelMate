@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1033502585630",
+    "project_id": "feelmate-c2a23",
+    "storage_bucket": "feelmate-c2a23.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1033502585630:android:adcf9a5df8fdadc07c8f0f",
+        "android_client_info": {
+          "package_name": "com.example.myapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCU7Z3lHQcEVnXNNmhgMIER4f4s_2feD9E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
