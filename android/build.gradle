@@ -19,3 +19,15 @@ subprojects {
 tasks.register("clean", Delete) {
     delete rootProject.buildDir
 }
+
+// tflite_flutter's own build.gradle sets Java 11 but leaves Kotlin
+// unspecified (defaults to whatever JDK runs Gradle, e.g. 21), causing an
+// "Inconsistent JVM Target Compatibility" failure. Target this one project by
+// name so we don't disturb the other subprojects' evaluation order.
+project(":tflite_flutter") {
+    afterEvaluate {
+        tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+            kotlinOptions.jvmTarget = "11"
+        }
+    }
+}

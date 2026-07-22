@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:myapp/pages/dashboard/camera_capture_screen.dart';
 import 'package:myapp/services/fer_service.dart';
 import 'package:myapp/utils/colors.dart';
 import 'package:image_picker/image_picker.dart';
@@ -26,7 +27,7 @@ class _InputPageState extends State<InputPage> {
     super.initState();
     if (widget.startWithCamera) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _pickImage(ImageSource.camera);
+        if (mounted) _openInAppCamera();
       });
     }
   }
@@ -40,6 +41,19 @@ class _InputPageState extends State<InputPage> {
       final bytes = await pickedFile.readAsBytes();
       setState(() {
         _image = pickedFile;
+        _imageBytes = bytes;
+      });
+    }
+  }
+
+  Future<void> _openInAppCamera() async {
+    final XFile? capturedFile = await Navigator.of(context).push<XFile>(
+      MaterialPageRoute(builder: (_) => const CameraCaptureScreen()),
+    );
+    if (capturedFile != null) {
+      final bytes = await capturedFile.readAsBytes();
+      setState(() {
+        _image = capturedFile;
         _imageBytes = bytes;
       });
     }
@@ -81,7 +95,7 @@ class _InputPageState extends State<InputPage> {
                     label: 'Take Photo',
                     onTap: () {
                       Navigator.pop(context);
-                      _pickImage(ImageSource.camera);
+                      _openInAppCamera();
                     },
                   ),
                 ),

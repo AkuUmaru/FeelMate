@@ -1,15 +1,19 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'dart:io';
+import 'dart:typed_data';
 
-/// Facial Expression Recognition service.
+import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
+import 'package:image/image.dart' as img;
+import 'package:tflite_flutter/tflite_flutter.dart';
+
+/// Facial Expression Recognition service — on-device TFLite inference.
 ///
-/// Primary:  Hugging Face Inference API — `trpakov/vit-face-expression`
-///           Free tier, no API key required for basic use.
-///           Returns 7 classes: angry | disgust | fear | happy | neutral | sad | surprise
+/// Model: `assets/models/facialemotionmodel.tflite`, a CNN trained on
+/// FER2013 (48x48 grayscale faces), measured at 60.9% test accuracy.
+/// 7 classes, label order fixed by training: angry | disgust | fear | happy
+/// | neutral | sad | surprise.
 ///
-/// Fallback: Original Cloud Run endpoint (if it comes back online).
-///
-/// Both paths produce the same normalized JSON that [ResultPage] expects:
+/// Produces the same normalized JSON that [ResultPage] expects:
 /// ```json
 /// {
 ///   "emotion": "happy",
@@ -18,20 +22,25 @@ import 'package:http/http.dart' as http;
 /// }
 /// ```
 class FerService {
-  // ─── Endpoints ──────────────────────────────────────────────────────────────
+  static const String _modelAsset = 'assets/models/facialemotionmodel.tflite';
 
-  static const String _hfModel = 'trpakov/vit-face-expression';
-  static const String _hfEndpoint =
-      'https://router.huggingface.co/hf-inference/models/$_hfModel';
+  static const List<String> _labels = [
+    'angry',
+    'disgust',
+    'fear',
+    'happy',
+    'neutral',
+    'sad',
+    'surprise',
+  ];
 
-  /// Required: HF's Inference Providers system now rejects anonymous
-  /// requests. Generate a fine-grained token with "Make calls to Inference
-  /// Providers" permission at:
-  /// https://huggingface.co/settings/tokens/new?ownUserPermissions=inference.serverless.write&tokenType=fineGrained
-  static const String _hfToken = '';
+  static Interpreter? _interpreter;
+  static final FaceDetector _faceDetector =
+      FaceDetector(options: FaceDetectorOptions(performanceMode: FaceDetectorMode.fast));
 
-  static const String _legacyEndpoint =
-      'https://emotion-based-game-model-185908856851.asia-southeast2.run.app/recommend';
+  static Future<Interpreter> _getInterpreter() async {
+    return _interpreter ??= await Interpreter.fromAsset(_modelAsset);
+  }
 
   // ─── Per-emotion activity recommendations ───────────────────────────────────
 
@@ -94,83 +103,68 @@ class FerService {
   /// Returns a normalized JSON string ready for [ResultPage].
   /// Throws a [FerException] on failure.
   static Future<String> classify(List<int> imageBytes, String filename) async {
-    // Try Hugging Face first (primary & more reliable)
+    // ML Kit's face detector needs a file path, so stage the bytes briefly.
+    final tempFile = File(
+        '${Directory.systemTemp.path}/fer_${DateTime.now().microsecondsSinceEpoch}_$filename');
+    await tempFile.writeAsBytes(imageBytes);
+    List<Face> faces;
     try {
-      return await _classifyWithHuggingFace(imageBytes);
-    } catch (hfErr) {
-      // HF failed — attempt legacy endpoint as secondary fallback
-      try {
-        return await _classifyWithLegacy(imageBytes, filename);
-      } catch (legacyErr) {
-        throw FerException(
-          'Both FER services are currently unavailable.\n'
-          'HuggingFace: $hfErr\n'
-          'Legacy: $legacyErr',
-        );
-      }
-    }
-  }
-
-  // ─── Hugging Face ────────────────────────────────────────────────────────────
-
-  static Future<String> _classifyWithHuggingFace(List<int> imageBytes) async {
-    final headers = <String, String>{
-      'Content-Type': 'application/octet-stream',
-      if (_hfToken.isNotEmpty) 'Authorization': 'Bearer $_hfToken',
-    };
-
-    final response = await http
-        .post(
-          Uri.parse(_hfEndpoint),
-          headers: headers,
-          body: imageBytes,
-        )
-        .timeout(const Duration(seconds: 30));
-
-    if (response.statusCode == 503) {
-      // Model is loading — parse retry time from response
-      throw FerException('Model is loading, please try again in ~20 seconds.');
+      faces = await _faceDetector.processImage(InputImage.fromFilePath(tempFile.path));
+    } finally {
+      tempFile.delete().ignore();
     }
 
-    if (response.statusCode != 200) {
-      throw FerException('HuggingFace returned ${response.statusCode}: ${response.body}');
+    if (faces.isEmpty) {
+      throw const FerException(
+          'No face detected — please retake with a clear, well-lit face.');
     }
 
-    // HF returns: [{"label":"happy","score":0.95}, {"label":"sad","score":0.03}, ...]
-    final List<dynamic> raw = jsonDecode(response.body) as List<dynamic>;
-    if (raw.isEmpty) throw FerException('Empty response from HuggingFace.');
+    final decoded = img.decodeImage(Uint8List.fromList(imageBytes));
+    if (decoded == null) {
+      throw const FerException('Could not decode the captured image.');
+    }
 
-    // Pick the top result
-    final top = raw.reduce((a, b) =>
-        (a['score'] as num) >= (b['score'] as num) ? a : b);
+    final box = faces.first.boundingBox;
+    final cropX = box.left.clamp(0, decoded.width - 1).toInt();
+    final cropY = box.top.clamp(0, decoded.height - 1).toInt();
+    final cropW = box.width.clamp(1, decoded.width - cropX).toInt();
+    final cropH = box.height.clamp(1, decoded.height - cropY).toInt();
 
-    final emotion = (top['label'] as String).toLowerCase();
-    final confidence = (top['score'] as num).toDouble();
+    final face = img.copyCrop(decoded, x: cropX, y: cropY, width: cropW, height: cropH);
+    final gray = img.grayscale(face);
+    final resized = img.copyResize(gray, width: 48, height: 48);
+
+    final input = List.generate(
+      1,
+      (_) => List.generate(
+        48,
+        (y) => List.generate(
+          48,
+          (x) => [resized.getPixel(x, y).r / 255.0],
+        ),
+      ),
+    );
+    final output = List.generate(1, (_) => List.filled(_labels.length, 0.0));
+
+    final interpreter = await _getInterpreter();
+    interpreter.run(input, output);
+
+    final scores = output[0];
+    var bestIdx = 0;
+    for (var i = 1; i < scores.length; i++) {
+      if (scores[i] > scores[bestIdx]) bestIdx = i;
+    }
+
+    final emotion = _labels[bestIdx];
+    final confidence = scores[bestIdx];
     final recs = _recommendations[emotion] ?? _recommendations['neutral']!;
 
     return jsonEncode({
       'emotion': emotion,
       'confidence': confidence,
       'recommendations': recs,
-      'source': 'huggingface',
+      'source': 'tflite',
     });
-  }
-
-  // ─── Legacy endpoint ─────────────────────────────────────────────────────────
-
-  static Future<String> _classifyWithLegacy(
-      List<int> imageBytes, String filename) async {
-    final request = http.MultipartRequest('POST', Uri.parse(_legacyEndpoint))
-      ..files.add(http.MultipartFile.fromBytes('file', imageBytes,
-          filename: filename));
-
-    final streamed = await request.send().timeout(const Duration(seconds: 20));
-    if (streamed.statusCode != 200) {
-      throw FerException('Legacy API returned ${streamed.statusCode}.');
-    }
-    final body = await streamed.stream.bytesToString();
-    jsonDecode(body); // validate JSON — throws FormatException if invalid
-    return body;
   }
 }
 
