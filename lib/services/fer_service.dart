@@ -22,11 +22,12 @@ class FerService {
 
   static const String _hfModel = 'trpakov/vit-face-expression';
   static const String _hfEndpoint =
-      'https://api-inference.huggingface.co/models/$_hfModel';
+      'https://router.huggingface.co/hf-inference/models/$_hfModel';
 
-  /// Optional: Set a free HuggingFace read-only token to get higher rate limits.
-  /// Get yours at https://huggingface.co/settings/tokens (free account).
-  /// Leave empty to use the public (anonymous) quota.
+  /// Required: HF's Inference Providers system now rejects anonymous
+  /// requests. Generate a fine-grained token with "Make calls to Inference
+  /// Providers" permission at:
+  /// https://huggingface.co/settings/tokens/new?ownUserPermissions=inference.serverless.write&tokenType=fineGrained
   static const String _hfToken = '';
 
   static const String _legacyEndpoint =
