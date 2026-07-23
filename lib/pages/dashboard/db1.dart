@@ -47,6 +47,7 @@ class _Db1State extends State<Db1> {
   Widget _buildFaceScanPage() => CameraCaptureScreen(
         key: UniqueKey(),
         onFinish: _onClassificationFinish,
+        onClose: () => _navigateTo(0),
       );
 
   Widget _buildMoodLogPage() => MoodLogPage(
@@ -154,7 +155,18 @@ class _Db1State extends State<Db1> {
       child: Scaffold(
         backgroundColor: kBackgroundColor,
         body: SafeArea(
-          child: IndexedStack(index: _currentIndex, children: _pages),
+          // Camera (slot 2) is only mounted while its tab is active. Keeping a
+          // live CameraPreview offstage inside an IndexedStack composites its
+          // surface over the whole app and blacks out every other tab.
+          child: IndexedStack(
+            index: _currentIndex,
+            children: [
+              for (int i = 0; i < _pages.length; i++)
+                (i == 2 && _currentIndex != 2)
+                    ? const SizedBox.shrink()
+                    : _pages[i],
+            ],
+          ),
         ),
         bottomNavigationBar: Container(
           decoration: BoxDecoration(

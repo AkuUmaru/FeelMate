@@ -18,7 +18,13 @@ import 'package:myapp/utils/colors.dart';
 class CameraCaptureScreen extends StatefulWidget {
   final Function(String result)? onFinish;
 
-  const CameraCaptureScreen({super.key, this.onFinish});
+  /// Called when the user taps the close (X) button. Used when this screen is
+  /// hosted as a tab (not a pushed route) so it can hand control back to the
+  /// host instead of popping the whole dashboard off the navigator (black
+  /// screen). Falls back to `Navigator.pop` when null.
+  final VoidCallback? onClose;
+
+  const CameraCaptureScreen({super.key, this.onFinish, this.onClose});
 
   @override
   State<CameraCaptureScreen> createState() => _CameraCaptureScreenState();
@@ -396,7 +402,13 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen>
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             // Close button
-            _iconBtn(Icons.close_rounded, () => Navigator.of(context).pop()),
+            _iconBtn(Icons.close_rounded, () {
+              if (widget.onClose != null) {
+                widget.onClose!();
+              } else {
+                Navigator.of(context).pop();
+              }
+            }),
 
             // Title
             Column(
