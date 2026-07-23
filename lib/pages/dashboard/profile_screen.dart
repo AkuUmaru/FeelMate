@@ -215,7 +215,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             subtitle: 'Remind me to check in with my emotions',
                             trailing: Switch.adaptive(
                               value: _notificationsOn,
-                              activeColor: kPrimaryColor,
+                              activeThumbColor: kPrimaryColor,
+                              activeTrackColor: kPrimaryColor.withValues(alpha: 0.5),
                               onChanged: (v) =>
                                   setState(() => _notificationsOn = v),
                             ),

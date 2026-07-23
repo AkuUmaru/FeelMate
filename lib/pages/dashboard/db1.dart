@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:myapp/pages/dashboard/ai_assistant_screen.dart';
+import 'package:myapp/pages/dashboard/camera_capture_screen.dart';
 import 'package:myapp/pages/dashboard/emotion_info_screen.dart';
 import 'package:myapp/pages/dashboard/impresion.dart';
 import 'package:myapp/pages/dashboard/impression_view.dart';
-import 'package:myapp/pages/dashboard/input_image.dart';
 import 'package:myapp/pages/dashboard/mood_log.dart';
 import 'package:myapp/pages/dashboard/profile_screen.dart';
 import 'package:myapp/pages/dashboard/resullt.dart';
@@ -30,7 +30,7 @@ class _Db1State extends State<Db1> {
     _pages = [
       HomeContent(key: UniqueKey()), // 0
       const EmotionInfoScreen(), // 1
-      InputPage(key: UniqueKey(), onFinish: _onClassificationFinish, startWithCamera: true), // 2
+      _buildFaceScanPage(), // 2
       _buildMoodLogPage(), // 3
       const ProfileScreen(), // 4
       Container(), // 5 – ResultPage (lazy)
@@ -43,6 +43,11 @@ class _Db1State extends State<Db1> {
   }
 
   // ─── Builders ──────────────────────────────────────────────────────────────
+
+  Widget _buildFaceScanPage() => CameraCaptureScreen(
+        key: UniqueKey(),
+        onFinish: _onClassificationFinish,
+      );
 
   Widget _buildMoodLogPage() => MoodLogPage(
         key: UniqueKey(),
@@ -93,13 +98,7 @@ class _Db1State extends State<Db1> {
   void _navigateTo(int index) {
     setState(() {
       if (index == 0) _pages[0] = HomeContent(key: UniqueKey());
-      if (index == 2) {
-        _pages[2] = InputPage(
-          key: UniqueKey(),
-          onFinish: _onClassificationFinish,
-          startWithCamera: true,
-        );
-      }
+      if (index == 2) _pages[2] = _buildFaceScanPage();
       if (index == 3) _pages[3] = _buildMoodLogPage();
       if (index == 4) _pages[4] = const ProfileScreen();
       _currentIndex = index;
@@ -288,14 +287,6 @@ class _HomeContentState extends State<HomeContent>
     parentState._navigateTo(index);
   }
 
-  void _goToWrite() {
-    final parentState = context.findAncestorStateOfType<_Db1State>();
-    if (parentState == null) return;
-    parentState.setState(() {
-      parentState._pages[7] = parentState._buildImpresionPage();
-      parentState._currentIndex = 7;
-    });
-  }
 
   void _goToAiAssistant() {
     Navigator.push(
@@ -535,64 +526,6 @@ class _HomeContentState extends State<HomeContent>
                 ),
                 const SizedBox(height: 26),
 
-                // ── Personality Islands Quick Actions ─────────────────────
-                Row(
-                  children: [
-                    const Text('🏝️', style: TextStyle(fontSize: 16)),
-                    const SizedBox(width: 8),
-                    Text('Personality Islands',
-                        style: GoogleFonts.nunito(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w900,
-                            color: kTextDark)),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _IslandCard(
-                        emoji: '📸',
-                        label: 'Scan\nEmotion',
-                        color: kJoyColor,
-                        onTap: () => _goToPage(2),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _IslandCard(
-                        emoji: '✍️',
-                        label: 'Write\nMood',
-                        color: kSadnessColor,
-                        onTap: _goToWrite,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _IslandCard(
-                        emoji: '🧠',
-                        label: 'Emotion\nGuide',
-                        color: kFearColor,
-                        onTap: () => _goToPage(1),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _IslandCard(
-                        emoji: '📖',
-                        label: 'Memory\nLog',
-                        color: kDisgustColor,
-                        onTap: () => _goToPage(3),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 26),
-
                 // ── Gemini Basic AI Assistant Banner ───────────────────────────────
                 GestureDetector(
                   onTap: _goToAiAssistant,
@@ -724,58 +657,3 @@ class _HomeContentState extends State<HomeContent>
   }
 }
 
-// ─── Personality Island Card Widget ───────────────────────────────────────────
-
-class _IslandCard extends StatelessWidget {
-  final String emoji;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _IslandCard({
-    required this.emoji,
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color.withValues(alpha: 0.35), width: 1.5),
-          boxShadow: const [kCardShadow],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.15),
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                  child: Text(emoji, style: const TextStyle(fontSize: 22))),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              label,
-              style: GoogleFonts.nunito(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 14,
-                  color: kTextDark,
-                  height: 1.3),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
