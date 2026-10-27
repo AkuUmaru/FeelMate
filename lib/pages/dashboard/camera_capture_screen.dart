@@ -189,7 +189,10 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen>
       ),
     );
     widget.onFinish?.call(fullResult);
-    if (mounted) Navigator.of(context).pop();
+    // Only pop when used as a pushed route. In tab mode the host's onFinish
+    // already navigates (to ResultPage); popping here would tear the whole
+    // dashboard off the navigator → black screen.
+    if (widget.onFinish == null && mounted) Navigator.of(context).pop();
   }
 
   void _showError(String message) {
