@@ -1,9 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:myapp/services/groq_service.dart';
 import 'package:myapp/utils/colors.dart';
 
-// ─── Message model ────────────────────────────────────────────────────────────
+// ─── Message model ──────────────────────────────────────────────────────────
 
 class _Msg {
   final String text;
@@ -18,7 +19,7 @@ class _Msg {
   }) : time = time ?? DateTime.now();
 }
 
-// ─── Gemini Basic AI Assistant Screen ──────────────────────────────────────────
+// ─── AI Assistant Screen ───────────────────────────────────────────────────
 
 class AiAssistantScreen extends StatefulWidget {
   const AiAssistantScreen({super.key});
@@ -38,43 +39,48 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
   late AnimationController _dotAnim;
 
   static const _quickReplies = [
-    'I feel anxious lately',
-    "I'm really stressed",
-    'I feel so sad',
-    "I can't sleep well",
-    'I need a friendly chat',
-    "I'm feeling lonely",
+    'Aku merasa cemas akhir-akhir ini',
+    'Aku lagi stres banget',
+    'Rasanya sedih dan lelah',
+    'Susah tidur belakangan ini',
+    'Pengen ngobrol santai aja',
+    'Merasa sendirian',
   ];
 
   static const _crisisKw = [
     'suicide', 'suicidal', 'kill myself', 'end my life', 'want to die',
     'no reason to live', 'better off dead', 'take my own life', 'self harm',
-    'hurt myself', "can't live anymore", 'wish i was dead',
+    'hurt myself', "can't live anymore", 'wish i was dead', 'bunuh diri',
+    'mati aja', 'mengakhiri hidup', 'melukai diri', 'mau mati', 'nyerah hidup',
   ];
   static const _highStressKw = [
     'overwhelmed', 'panic attack', "can't cope", 'breaking down', 'burnout',
     'completely exhausted', "can't go on", 'no hope', 'nothing matters',
     'pointless', 'hopeless', 'worthless', "can't take it", 'falling apart',
-    'give up',
+    'give up', 'kewalahan', 'panik', 'beban berat', 'putus asa', 'capek batin',
   ];
   static const _sadKw = [
     'sad', 'cry', 'crying', 'depressed', 'depression', 'unhappy', 'lonely',
     'alone', 'empty', 'grief', 'heartbreak', 'heartbroken', 'miserable',
-    'down', 'blue', 'gloomy', 'tearful', 'devastated',
+    'down', 'blue', 'gloomy', 'tearful', 'devastated', 'sedih', 'nangis',
+    'menangis', 'hampa', 'kecewa', 'patah hati', 'kesepian',
   ];
   static const _anxietyKw = [
     'anxious', 'anxiety', 'worried', 'worry', 'nervous', 'scared', 'fear',
     'afraid', 'panic', 'stress', 'stressed', 'tense', 'dread', 'uneasy',
-    'restless', 'overthinking',
+    'restless', 'overthinking', 'cemas', 'takut', 'khawatir', 'was-was',
+    'gugup', 'stres',
   ];
   static const _angerKw = [
     'angry', 'anger', 'furious', 'rage', 'frustrated', 'frustration', 'mad',
-    'annoyed', 'irritated', 'livid', 'enraged', 'upset',
+    'annoyed', 'irritated', 'livid', 'enraged', 'upset', 'marah', 'kesal',
+    'emosi', 'jengkel', 'frustrasi',
   ];
   static const _positiveKw = [
     'happy', 'great', 'good', 'amazing', 'wonderful', 'joy', 'joyful',
     'excited', 'grateful', 'thankful', 'blessed', 'fantastic', 'awesome',
-    'better', 'improving', 'hopeful', 'okay', 'fine', 'alright',
+    'better', 'improving', 'hopeful', 'okay', 'fine', 'alright', 'senang',
+    'bahagia', 'lega', 'bersyukur', 'semangat', 'tenang',
   ];
 
   @override
@@ -89,7 +95,8 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
       if (!mounted) return;
       setState(() {
         _msgs.add(_Msg(
-          text: "Hi there! I'm Gemini Basic ✨\n\nI'm your friendly, empathetic companion. You can talk to me about anything on your mind — no stress, just a calm and supportive conversation.\n\nHow are you feeling today?",
+          text:
+              "Hai! Aku FeelMate AI Companion ✨\n\nAku di sini sebagai sahabat yang siap mendengarkan ceritamu dengan hangat, aman, dan tanpa penghakiman.\n\nBagaimana perasaanmu hari ini? Ada hal yang ingin kamu ceritakan?",
           isUser: false,
         ));
       });
@@ -121,54 +128,45 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
     return keywords.any((kw) => lower.contains(kw));
   }
 
-  String _generateResponse(String userMsg) {
+  String _generateFallbackResponse(String userMsg) {
     final alwaysRef = _distressCount >= 3;
     const ref =
-        "\n\n💙 Gemini Note: Because you're carrying a heavy emotional load right now, please consider talking to a doctor, specialist, or psychiatrist for extra care.";
-
-    if (_containsAny(userMsg, _crisisKw)) {
-      _distressCount += 3;
-      return '__CRISIS__';
-    }
+        "\n\n💙 FeelMate Note: Karena beban perasaanmu tampak cukup berat, jangan ragu untuk berbagi dengan konselor, psikolog, atau orang terdekat yang kamu percaya.";
 
     if (_containsAny(userMsg, _highStressKw)) {
-      _distressCount += 2;
       final list = [
-        "I hear how overwhelming everything feels right now ✨. Please take a moment to breathe slowly with me.\n\nDeep inhale → slow exhale 🌿.\n\nYou don't have to fix everything today. What is one tiny thing causing you stress right now?",
-        "That sounds like a heavy weight to carry alone. I'm here with you, listening with a warm heart.\n\nCan you tell me a little more about what's been stressing you out?",
-        "When things pile up, it's completely natural to feel exhausted. Be gentle with yourself today.\n\nWhat can we do to make today just 5% lighter for you?",
+        "Aku mengerti betapa berat dan melelahkannya situasi ini bagimu ✨. Tarik napas perlahan bersamaku yuk.\n\nTarik napas dalam → hembuskan perlahan 🌿.\n\nKamu tidak harus menyelesaikan semuanya sekaligus hari ini. Apa satu hal kecil yang paling membebanimu saat ini?",
+        "Membawa beban seberat ini sendirian pasti sangat menguras energimu. Aku di sini menemanimu dan mendengarkan dengan tulus.\n\nMau ceritakan sedikit lagi tentang apa yang sedang kamu rasakan?",
+        "Saat semua hal terasa menumpuk, sangat wajar jika kamu merasa lelah. Bersikaplah lembut pada dirimu sendiri hari ini ya.\n\nApa hal kecil yang bisa membuat harimu terasa sedikit lebih ringan?",
       ];
       final r = list[DateTime.now().millisecond % list.length];
-      return r + (alwaysRef ? ref : "\n\n💡 Remember: If stress stays this high, speaking to a certified mental health specialist is a wonderful way to care for yourself.");
+      return r + (alwaysRef ? ref : "\n\n💡 Ingat: Luangkan waktu untuk istirahat sejenak, kesehatan mentalmu sangat berharga.");
     }
 
     if (_containsAny(userMsg, _sadKw)) {
-      _distressCount += 1;
       final list = [
-        "I'm sending you a warm virtual hug ✨. It's completely okay to feel sad or tearful — feelings come and go like rain.\n\nWould it help to talk about what brought on this sadness?",
-        "Thank you for sharing that with me. Your feelings are valid and deserving of kindness.\n\nWhat's one gentle thing you can do for yourself right now, like drinking some warm tea or wrapping up in a blanket?",
-        "Sadness often means we care deeply about something. I'm right here listening — take as much time as you need.",
+        "Aku kirimkan pelukan hangat untukmu ✨. Sangat wajar untuk merasa sedih atau ingin menangis — emosi hadir untuk dirasakan dan akan berlalu perlahan.\n\nApakah kamu ingin menceritakan apa yang membuatmu bersedih?",
+        "Terima kasih sudah mau berbagi cerita denganku. Perasaanmu valid dan pantas mendapatkan ruang yang nyaman.\n\nHal lembut apa yang bisa kamu lakukan untuk dirimu sekarang, seperti minum teh hangat atau beristirahat sejenak?",
+        "Rasa sedih sering kali menandakan ada hal yang sangat berharga bagimu. Aku di sini mendengarkan — ambil waktu sebanyak yang kamu butuhkan ya.",
       ];
       final r = list[DateTime.now().millisecond % list.length];
       return r + (alwaysRef ? ref : '');
     }
 
     if (_containsAny(userMsg, _anxietyKw)) {
-      _distressCount += 1;
       final list = [
-        "Anxiety can make thoughts feel fast and noisy ✨. Let's ground ourselves together.\n\nLook around and name 3 simple objects near you. I'm here with you, step by step.",
-        "It's okay to feel nervous or uncertain. Your mind is trying to protect you, even if it feels uncomfortable.\n\nWhat is the main worry on your mind right now?",
-        "Take a slow breath with me 🌿. You're safe right here in this chat. Let's break down whatever you're facing into smaller, easier pieces.",
+        "Rasa cemas bisa membuat pikiran kita berlari cepat dan bising ✨. Mari kita lakukan grounding sederhana bersama.\n\nCoba lihat sekelilingmu dan sebutkan 3 benda sederhana yang kamu lihat. Aku ada di sini bersamamu.",
+        "Wajar untuk merasa was-was atau tidak tenang. Pikiranmu sedang berusaha melindungimu, meskipun rasanya tidak nyaman.\n\nApa kekhawatiran utama yang paling berputar di kepalamu saat ini?",
+        "Tarik napas perlahan bersamaku 🌿. Di obrolan ini kamu aman. Mari kita urai hal yang membuatmu cemas satu per satu secara perlahan.",
       ];
       final r = list[DateTime.now().millisecond % list.length];
       return r + (alwaysRef ? ref : '');
     }
 
     if (_containsAny(userMsg, _angerKw)) {
-      _distressCount += 1;
       final list = [
-        "I hear how frustrating that situation is ✨. Anger is a sign that something important to you was crossed.\n\nWould you like to vent about what happened? I'm listening without judgment.",
-        "That sounds infuriating. It's okay to feel mad — let's give those feelings space to cool down naturally.\n\nWhat triggered this anger today?",
+        "Aku paham rasa kesal dan frustrasi yang kamu alami ✨. Marah adalah tanda ada batasan atau hal penting yang terganggu bagimu.\n\nKeluarkan saja apa yang ingin kamu ceritakan, aku mendengarkan tanpa menghakimi.",
+        "Situasi seperti itu memang bisa membuat emosi memuncak. Tidak apa-apa merasa kesal — mari kita beri ruang agar perasaanmu perlahan mereda.\n\nApa pemicu utama yang membuatmu merasa sangat marah hari ini?",
       ];
       final r = list[DateTime.now().millisecond % list.length];
       return r + (alwaysRef ? ref : '');
@@ -176,23 +174,23 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
 
     if (_containsAny(userMsg, _positiveKw)) {
       final list = [
-        "That brings a warm smile to my heart! ✨ What nice moment made you feel good today?",
-        "I'm so glad to hear that! 🌟 Celebrating small wins and happy moments is so special. Tell me more!",
-        "That's wonderful! Savoring joyful feelings gives us strength. What's been going well?",
+        "Senang sekali mendengarnya! ✨ Momen menyenangkan apa yang membuat harimu terasa indah hari ini?",
+        "Alhamdulillah, ikut bahagia mendengarnya! 🌟 Merayakan kabar baik dan perasaan bahagia itu sangat penting. Ceritakan lebih banyak dong!",
+        "Luar biasa! Merasakan sukacita memberi kita energi positif baru. Apa yang berjalan lancar hari ini?",
       ];
       return list[DateTime.now().millisecond % list.length];
     }
 
     final defaults = [
-      "I'm listening with an open heart ✨. Tell me a bit more about how you're feeling right now.",
-      "Thank you for opening up to me! I'm here to chat whenever you need a friendly ear.",
-      "That sounds like a lot to hold. Take your time — what's most on your mind right now?",
-      "I'm glad we're chatting. How has your day been treating you overall?",
+      "Aku mendengarkan dengan penuh perhatian ✨. Ceritakan lebih lanjut apa yang sedang ada di benakmu sekarang ya.",
+      "Terima kasih sudah terbuka dan bercerita padaku! Aku selalu ada di sini kapan pun kamu butuh teman mengobrol.",
+      "Tampaknya ada banyak hal yang kamu rasakan hari ini. Pelan-pelan saja — apa yang paling ingin kamu sampaikan?",
+      "Senang bisa mengobrol denganmu. Bagaimana harimu berjalan sejauh ini?",
     ];
     return defaults[DateTime.now().millisecond % defaults.length] + (alwaysRef ? ref : '');
   }
 
-  void _send([String? quickReply]) {
+  void _send([String? quickReply]) async {
     final text = (quickReply ?? _ctrl.text).trim();
     if (text.isEmpty) return;
 
@@ -204,22 +202,63 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
     });
     _scrollToBottom();
 
-    final delayMs = (700 + text.length * 10).clamp(600, 1800);
-    Future.delayed(Duration(milliseconds: delayMs), () {
+    // 1. Immediate Safety Check: Crisis keywords trigger hotlines directly
+    if (_containsAny(text, _crisisKw)) {
+      _distressCount += 3;
+      await Future.delayed(const Duration(milliseconds: 500));
       if (!mounted) return;
-      final raw = _generateResponse(text);
       setState(() {
         _typing = false;
         _msgs.add(_Msg(
-          text: raw == '__CRISIS__'
-              ? "I'm really concerned about how much pain you're in ✨.\n\nPlease know that your life is valuable and you don't have to carry this alone. I strongly encourage you to connect with a crisis counselor or healthcare specialist right away."
-              : raw,
+          text:
+              "Aku sangat peduli dan prihatin dengan rasa sakit yang kamu rasakan saat ini ✨.\n\nKetahuilah bahwa hidupmu sangat berharga dan kamu tidak harus menanggung semua ini sendirian. Aku sangat menyarankanmu untuk segera menghubungi layanan konseling krisis atau profesional kesehatan sekarang.",
           isUser: false,
-          isCrisis: raw == '__CRISIS__',
+          isCrisis: true,
         ));
       });
       _scrollToBottom();
-    });
+      return;
+    }
+
+    // 2. Track emotional indicators for supportive care
+    if (_containsAny(text, _highStressKw)) {
+      _distressCount += 2;
+    } else if (_containsAny(text, _sadKw) ||
+        _containsAny(text, _anxietyKw) ||
+        _containsAny(text, _angerKw)) {
+      _distressCount += 1;
+    }
+
+    // 3. Dynamic LLM Response via Groq Cloud
+    try {
+      final history = <Map<String, String>>[];
+      for (final m in _msgs.reversed) {
+        if (m.isCrisis) continue;
+        history.insert(0, {
+          'role': m.isUser ? 'user' : 'assistant',
+          'content': m.text,
+        });
+        if (history.length >= 8) break;
+      }
+
+      final aiReply = await GroqService.getReply(history);
+      if (!mounted) return;
+
+      setState(() {
+        _typing = false;
+        _msgs.add(_Msg(text: aiReply, isUser: false));
+      });
+      _scrollToBottom();
+    } catch (_) {
+      // 4. Graceful Fallback to offline rule-based response
+      if (!mounted) return;
+      final fallbackReply = _generateFallbackResponse(text);
+      setState(() {
+        _typing = false;
+        _msgs.add(_Msg(text: fallbackReply, isUser: false));
+      });
+      _scrollToBottom();
+    }
   }
 
   @override
@@ -288,11 +327,11 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Gemini Basic', style: GoogleFonts.nunito(fontSize: 17, fontWeight: FontWeight.w900, color: kTextDark)),
+                    Text('FeelMate AI', style: GoogleFonts.nunito(fontSize: 17, fontWeight: FontWeight.w900, color: kTextDark)),
                     Row(children: [
                       Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle)),
                       const SizedBox(width: 6),
-                      Text('Empathetic Emotional Support', style: GoogleFonts.nunito(fontSize: 12, fontWeight: FontWeight.w600, color: kTextMuted)),
+                      Text('Empathetic Companion • Online', style: GoogleFonts.nunito(fontSize: 12, fontWeight: FontWeight.w600, color: kTextMuted)),
                     ]),
                   ],
                 ),
@@ -304,7 +343,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: kPrimaryColor.withValues(alpha: 0.3)),
                 ),
-                child: Text('Gemini', style: GoogleFonts.nunito(fontSize: 11, fontWeight: FontWeight.w800, color: kPrimaryColor)),
+                child: Text('Groq AI', style: GoogleFonts.nunito(fontSize: 11, fontWeight: FontWeight.w800, color: kPrimaryColor)),
               ),
             ],
           ),
@@ -387,7 +426,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Immediate Professional Support Needed',
+                  'Bantuan Profesional & Dukungan Krisis',
                   style: GoogleFonts.nunito(fontSize: 15, fontWeight: FontWeight.w900, color: const Color(0xFF991B1B)),
                 ),
               ),
@@ -401,12 +440,12 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('🇮🇩 Crisis Hotlines — Indonesia', style: GoogleFonts.nunito(fontSize: 12, fontWeight: FontWeight.w800, color: const Color(0xFF991B1B))),
+                  Text('🇮🇩 Hotline Bantuan Krisis — Indonesia', style: GoogleFonts.nunito(fontSize: 12, fontWeight: FontWeight.w800, color: const Color(0xFF991B1B))),
                   const SizedBox(height: 10),
-                  _hotlineRow('☎️', 'Into The Light / Kemenkes', '119 ext 8 (24/7)'),
-                  _hotlineRow('☎️', 'Sejiwa Foundation', '119'),
+                  _hotlineRow('☎️', 'Kemenkes Sejiwa', '119 ext 8 (24 Jam Bebas Pulsa)'),
+                  _hotlineRow('☎️', 'LISA Suicide Prevention', '0811-3855-472 (24 Jam)'),
                   _hotlineRow('☎️', 'PDSKJI Helpline', '021-500-454'),
-                  _hotlineRow('☎️', 'Yayasan Pulih', '(021) 788-42580'),
+                  _hotlineRow('☎️', 'Yayasan Pulih Konseling', '(021) 788-42580'),
                 ],
               ),
             ),
@@ -422,10 +461,10 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
                   elevation: 0,
                 ),
                 icon: const Icon(Icons.medical_services_outlined, size: 18),
-                label: Text('Find a Specialist / Psychiatrist', style: GoogleFonts.nunito(fontWeight: FontWeight.w800, fontSize: 14)),
+                label: Text('Informasi Psikolog & Psikiater (PDSKJI)', style: GoogleFonts.nunito(fontWeight: FontWeight.w800, fontSize: 14)),
                 onPressed: () {
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text('Visit pdskji.org to locate a certified psychiatrist near you.', style: GoogleFonts.nunito(fontSize: 13, fontWeight: FontWeight.w600)),
+                    content: Text('Kunjungi pdskji.org untuk informasi psikiater & fasilitas kesehatan mental terdekat.', style: GoogleFonts.nunito(fontSize: 13, fontWeight: FontWeight.w600)),
                     backgroundColor: const Color(0xFFDC2626),
                     behavior: SnackBarBehavior.floating,
                   ));
@@ -509,7 +548,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
         children: [
           Padding(
             padding: const EdgeInsets.only(left: 44, bottom: 8),
-            child: Text('Quick suggestions — tap to start:', style: GoogleFonts.nunito(fontSize: 12, fontWeight: FontWeight.w700, color: kTextMuted)),
+            child: Text('Saran cepat — ketuk untuk memulai:', style: GoogleFonts.nunito(fontSize: 12, fontWeight: FontWeight.w700, color: kTextMuted)),
           ),
           SizedBox(
             height: 42,
@@ -552,7 +591,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
         const SizedBox(width: 12),
         Expanded(
           child: Text(
-            'Gemini Note: Based on our conversation, please consider speaking with a licensed specialist or psychiatrist. You deserve dedicated care 💙',
+            'Catatan FeelMate: Berdasarkan obrolan kita, jangan ragu untuk berkonsultasi dengan psikolog atau konselor profesional ya. Kamu berhak mendapatkan pendampingan terbaik 💙',
             style: GoogleFonts.nunito(fontSize: 12, fontWeight: FontWeight.w700, color: const Color(0xFF92400E), height: 1.45),
           ),
         ),
@@ -582,7 +621,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
               minLines: 1,
               style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w600, color: kTextDark),
               decoration: InputDecoration(
-                hintText: "Talk to Gemini Basic...",
+                hintText: "Ceritakan apa yang kamu rasakan...",
                 hintStyle: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w500, color: kTextMuted),
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),

@@ -578,7 +578,7 @@ class _HomeContentState extends State<HomeContent>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Gemini Basic AI ✨',
+                                'FeelMate AI Companion ✨',
                                 style: GoogleFonts.nunito(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w900,
@@ -586,7 +586,7 @@ class _HomeContentState extends State<HomeContent>
                               ),
                               const SizedBox(height: 3),
                               Text(
-                                'Talk to Gemini — your safe, empathetic space for simple emotional chats',
+                                'Teman ceritamu yang aman, hangat, dan siap mendengarkan setiap saat',
                                 style: GoogleFonts.nunito(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
