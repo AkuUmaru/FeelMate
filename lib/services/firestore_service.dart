@@ -25,6 +25,22 @@ class FirestoreService {
     });
   }
 
+  /// Ensures user profile exists in Firestore when signing in via Google.
+  static Future<void> syncGoogleUser(User user) async {
+    final doc = await _db.collection('users').doc(user.uid).get();
+    if (!doc.exists) {
+      await _db.collection('users').doc(user.uid).set({
+        'uid': user.uid,
+        'email': user.email ?? '',
+        'displayName': user.displayName ?? 'FeelMate Friend',
+        'createdAt': FieldValue.serverTimestamp(),
+        'lastLogin': FieldValue.serverTimestamp(),
+      });
+    } else {
+      await updateLastLogin(user.uid);
+    }
+  }
+
   // ─── Emotional Logs ─────────────────────────────────────────────────────────
 
   static CollectionReference<Map<String, dynamic>> _logsCollection(

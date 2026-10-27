@@ -7,6 +7,7 @@ import 'package:myapp/pages/dashboard/db1.dart';
 import 'package:myapp/services/auth_service.dart';
 import 'package:myapp/services/firestore_service.dart';
 import 'package:myapp/utils/colors.dart';
+import 'package:myapp/widgets/google_sign_in_button.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -22,6 +23,7 @@ class _LoginScreenState extends State<LoginScreen>
   final _passCtrl = TextEditingController();
   bool _obscure = true;
   bool _loading = false;
+  bool _googleLoading = false;
   late AnimationController _animCtrl;
   late Animation<double> _fadeAnim;
   late Animation<Offset> _slideAnim;
@@ -65,6 +67,32 @@ class _LoginScreenState extends State<LoginScreen>
       _showError(AuthService.errorMessage(e));
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _googleSignIn() async {
+    setState(() => _googleLoading = true);
+    try {
+      final cred = await AuthService.signInWithGoogle();
+      if (cred == null) {
+        // User dismissed the Google dialog
+        return;
+      }
+      final user = cred.user;
+      if (user != null) {
+        await FirestoreService.syncGoogleUser(user);
+      }
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const Db1()),
+        (_) => false,
+      );
+    } on FirebaseAuthException catch (e) {
+      _showError(AuthService.errorMessage(e));
+    } catch (e) {
+      _showError('Google Sign-In failed: $e');
+    } finally {
+      if (mounted) setState(() => _googleLoading = false);
     }
   }
 
@@ -148,23 +176,34 @@ class _LoginScreenState extends State<LoginScreen>
                                     begin: Alignment.topLeft,
                                     end: Alignment.bottomRight,
                                   ),
-                                  shape: BoxShape.circle,
+                                  borderRadius: BorderRadius.circular(26),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: kPrimaryColor.withValues(alpha: 0.35),
-                                      blurRadius: 24,
+                                      color:
+                                          kPrimaryColor.withValues(alpha: 0.35),
+                                      blurRadius: 20,
                                       offset: const Offset(0, 10),
                                     ),
                                   ],
                                 ),
-                                child: const Icon(Icons.mood,
-                                    size: 46, color: Colors.white),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(26),
+                                  child: Image.asset(
+                                    'assets/logo/FeelMateLogo2.png',
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => const Icon(
+                                      Icons.favorite_rounded,
+                                      color: Colors.white,
+                                      size: 44,
+                                    ),
+                                  ),
+                                ),
                               ),
                               const SizedBox(height: 18),
                               Text(
                                 'FeelMate',
                                 style: GoogleFonts.poppins(
-                                  fontSize: 30,
+                                  fontSize: 26,
                                   fontWeight: FontWeight.w800,
                                   color: kTextDark,
                                   letterSpacing: -0.5,
@@ -172,7 +211,7 @@ class _LoginScreenState extends State<LoginScreen>
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'Sign in to continue your journey',
+                                'Track your emotion, heal your mind',
                                 style: GoogleFonts.poppins(
                                   fontSize: 13,
                                   color: Colors.grey.shade500,
@@ -183,33 +222,61 @@ class _LoginScreenState extends State<LoginScreen>
                         ),
                         const SizedBox(height: 44),
 
-                        // Email field
-                        _label('Email address'),
+                        // Welcome text
+                        Text(
+                          'Welcome back 👋',
+                          style: GoogleFonts.poppins(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700,
+                            color: kTextDark,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Sign in to continue your emotional journey',
+                          style: GoogleFonts.poppins(
+                            fontSize: 13,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                        const SizedBox(height: 28),
+
+                        // Email Field
+                        _label('Email Address'),
                         const SizedBox(height: 8),
                         TextFormField(
                           controller: _emailCtrl,
                           keyboardType: TextInputType.emailAddress,
-                          style: GoogleFonts.poppins(fontSize: 14, color: kTextDark),
+                          style: GoogleFonts.poppins(
+                              fontSize: 14, color: kTextDark),
                           decoration: _inputDecoration(
-                            hint: 'you@example.com',
-                            icon: Icons.email_outlined,
+                            hint: 'your.name@email.com',
+                            icon: Icons.mail_outline_rounded,
                           ),
-                          validator: (v) => (v == null || !v.contains('@'))
-                              ? 'Enter a valid email'
-                              : null,
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) {
+                              return 'Please enter your email';
+                            }
+                            if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                                .hasMatch(v.trim())) {
+                              return 'Please enter a valid email address';
+                            }
+                            return null;
+                          },
                         ),
                         const SizedBox(height: 20),
 
-                        // Password field
+                        // Password Field
                         _label('Password'),
                         const SizedBox(height: 8),
                         TextFormField(
                           controller: _passCtrl,
                           obscureText: _obscure,
-                          style: GoogleFonts.poppins(fontSize: 14, color: kTextDark),
+                          style: GoogleFonts.poppins(
+                              fontSize: 14, color: kTextDark),
                           decoration: _inputDecoration(
                             hint: '••••••••',
-                            icon: Icons.lock_outline,
+                            icon: Icons.lock_outline_rounded,
                             suffix: IconButton(
                               icon: Icon(
                                 _obscure
@@ -222,28 +289,34 @@ class _LoginScreenState extends State<LoginScreen>
                                   setState(() => _obscure = !_obscure),
                             ),
                           ),
-                          validator: (v) => (v == null || v.length < 6)
-                              ? 'Min 6 characters'
-                              : null,
+                          validator: (v) {
+                            if (v == null || v.isEmpty) {
+                              return 'Please enter your password';
+                            }
+                            if (v.length < 6) {
+                              return 'Password must be at least 6 characters';
+                            }
+                            return null;
+                          },
                         ),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 12),
 
-                        // Forgot password
+                        // Forgot Password
                         Align(
                           alignment: Alignment.centerRight,
                           child: TextButton(
                             onPressed: () => Navigator.push(
                               context,
                               MaterialPageRoute(
-                                  builder: (_) =>
-                                      const ForgotPasswordScreen()),
+                                  builder: (_) => const ForgotPasswordScreen()),
                             ),
                             style: TextButton.styleFrom(
                               padding: EdgeInsets.zero,
-                              minimumSize: const Size(0, 0),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             ),
                             child: Text(
-                              'Forgot password?',
+                              'Forgot Password?',
                               style: GoogleFonts.poppins(
                                 fontSize: 13,
                                 color: kPrimaryColor,
@@ -254,7 +327,7 @@ class _LoginScreenState extends State<LoginScreen>
                         ),
                         const SizedBox(height: 28),
 
-                        // Sign In button
+                        // Sign In Button
                         SizedBox(
                           width: double.infinity,
                           height: 54,
@@ -275,7 +348,7 @@ class _LoginScreenState extends State<LoginScreen>
                               ],
                             ),
                             child: ElevatedButton(
-                              onPressed: _loading ? null : _login,
+                              onPressed: (_loading || _googleLoading) ? null : _login,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.transparent,
                                 shadowColor: Colors.transparent,
@@ -301,7 +374,7 @@ class _LoginScreenState extends State<LoginScreen>
                             ),
                           ),
                         ),
-                        const SizedBox(height: 32),
+                        const SizedBox(height: 28),
 
                         // Divider
                         Row(
@@ -312,7 +385,7 @@ class _LoginScreenState extends State<LoginScreen>
                               padding:
                                   const EdgeInsets.symmetric(horizontal: 12),
                               child: Text(
-                                'or',
+                                'or continue with',
                                 style: GoogleFonts.poppins(
                                     color: Colors.grey.shade400, fontSize: 12),
                               ),
@@ -321,7 +394,15 @@ class _LoginScreenState extends State<LoginScreen>
                                 child: Divider(color: Colors.grey.shade200)),
                           ],
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 20),
+
+                        // Google Sign-In Button
+                        GoogleSignInButton(
+                          onPressed: _googleSignIn,
+                          isLoading: _googleLoading,
+                          label: 'Sign in with Google',
+                        ),
+                        const SizedBox(height: 28),
 
                         // Sign Up link
                         Center(

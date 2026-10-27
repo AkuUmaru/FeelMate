@@ -6,6 +6,7 @@ import 'package:myapp/pages/dashboard/db1.dart';
 import 'package:myapp/services/auth_service.dart';
 import 'package:myapp/services/firestore_service.dart';
 import 'package:myapp/utils/colors.dart';
+import 'package:myapp/widgets/google_sign_in_button.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -24,6 +25,7 @@ class _SignUpScreenState extends State<SignUpScreen>
   bool _obscurePass = true;
   bool _obscureConfirm = true;
   bool _loading = false;
+  bool _googleLoading = false;
   late AnimationController _animCtrl;
   late Animation<double> _fadeAnim;
 
@@ -71,6 +73,31 @@ class _SignUpScreenState extends State<SignUpScreen>
     }
   }
 
+  Future<void> _googleSignIn() async {
+    setState(() => _googleLoading = true);
+    try {
+      final cred = await AuthService.signInWithGoogle();
+      if (cred == null) {
+        // User dismissed the Google dialog
+        return;
+      }
+      if (cred.user != null) {
+        await FirestoreService.syncGoogleUser(cred.user!);
+      }
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const Db1()),
+        (_) => false,
+      );
+    } on FirebaseAuthException catch (e) {
+      _showError(AuthService.errorMessage(e));
+    } catch (e) {
+      _showError('Google Sign-In failed: $e');
+    } finally {
+      if (mounted) setState(() => _googleLoading = false);
+    }
+  }
+
   void _showError(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -88,41 +115,53 @@ class _SignUpScreenState extends State<SignUpScreen>
       backgroundColor: kBackgroundColor,
       body: Stack(
         children: [
-          // Decorative accent
+          // Top decorative gradient blob
           Positioned(
             top: -60,
-            left: -60,
+            right: -60,
             child: Container(
-              width: 220,
-              height: 220,
+              width: 240,
+              height: 240,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    kPrimaryColor.withValues(alpha: 0.18),
+                    kPrimaryColor.withValues(alpha: 0.2),
                     kPrimaryColor.withValues(alpha: 0.0),
                   ],
                 ),
               ),
             ),
           ),
+
           SafeArea(
             child: Column(
               children: [
-                // App bar
+                // Top app bar with back button
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Row(
                     children: [
                       IconButton(
-                        icon: Icon(Icons.arrow_back_ios_new,
-                            color: kTextDark, size: 18),
+                        icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                            size: 20),
+                        color: kTextDark,
                         onPressed: () => Navigator.pop(context),
+                      ),
+                      Text(
+                        'Create Account',
+                        style: GoogleFonts.poppins(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: kTextDark,
+                        ),
                       ),
                     ],
                   ),
                 ),
 
+                // Form content
                 Expanded(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.symmetric(horizontal: 28),
@@ -133,27 +172,27 @@ class _SignUpScreenState extends State<SignUpScreen>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 12),
                             Text(
-                              'Create Account',
+                              'Join FeelMate 🌱',
                               style: GoogleFonts.poppins(
-                                fontSize: 28,
+                                fontSize: 24,
                                 fontWeight: FontWeight.w800,
                                 color: kTextDark,
-                                letterSpacing: -0.5,
                               ),
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Join FeelMate and start tracking your emotions',
+                              'Start understanding your emotions better every day',
                               style: GoogleFonts.poppins(
                                 fontSize: 13,
                                 color: Colors.grey.shade500,
                               ),
                             ),
-                            const SizedBox(height: 32),
+                            const SizedBox(height: 28),
 
-                            _label('Display Name'),
+                            // Full Name
+                            _label('Full Name'),
                             const SizedBox(height: 8),
                             TextFormField(
                               controller: _nameCtrl,
@@ -161,16 +200,23 @@ class _SignUpScreenState extends State<SignUpScreen>
                               style: GoogleFonts.poppins(
                                   fontSize: 14, color: kTextDark),
                               decoration: _inputDec(
-                                hint: 'Your full name',
-                                icon: Icons.person_outline,
+                                hint: 'John Doe',
+                                icon: Icons.person_outline_rounded,
                               ),
-                              validator: (v) => (v == null || v.trim().isEmpty)
-                                  ? 'Enter your name'
-                                  : null,
+                              validator: (v) {
+                                if (v == null || v.trim().isEmpty) {
+                                  return 'Please enter your name';
+                                }
+                                if (v.trim().length < 2) {
+                                  return 'Name must be at least 2 characters';
+                                }
+                                return null;
+                              },
                             ),
                             const SizedBox(height: 18),
 
-                            _label('Email address'),
+                            // Email
+                            _label('Email Address'),
                             const SizedBox(height: 8),
                             TextFormField(
                               controller: _emailCtrl,
@@ -178,16 +224,23 @@ class _SignUpScreenState extends State<SignUpScreen>
                               style: GoogleFonts.poppins(
                                   fontSize: 14, color: kTextDark),
                               decoration: _inputDec(
-                                hint: 'you@example.com',
-                                icon: Icons.email_outlined,
+                                hint: 'your.name@email.com',
+                                icon: Icons.mail_outline_rounded,
                               ),
-                              validator: (v) =>
-                                  (v == null || !v.contains('@'))
-                                      ? 'Enter a valid email'
-                                      : null,
+                              validator: (v) {
+                                if (v == null || v.trim().isEmpty) {
+                                  return 'Please enter your email';
+                                }
+                                if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                                    .hasMatch(v.trim())) {
+                                  return 'Please enter a valid email address';
+                                }
+                                return null;
+                              },
                             ),
                             const SizedBox(height: 18),
 
+                            // Password
                             _label('Password'),
                             const SizedBox(height: 8),
                             TextFormField(
@@ -196,17 +249,25 @@ class _SignUpScreenState extends State<SignUpScreen>
                               style: GoogleFonts.poppins(
                                   fontSize: 14, color: kTextDark),
                               decoration: _inputDec(
-                                hint: 'Min 6 characters',
-                                icon: Icons.lock_outline,
-                                suffix: _eye(_obscurePass,
-                                    () => setState(() => _obscurePass = !_obscurePass)),
+                                hint: 'At least 6 characters',
+                                icon: Icons.lock_outline_rounded,
+                                suffix: _eye(_obscurePass, () {
+                                  setState(() => _obscurePass = !_obscurePass);
+                                }),
                               ),
-                              validator: (v) => (v == null || v.length < 6)
-                                  ? 'Min 6 characters'
-                                  : null,
+                              validator: (v) {
+                                if (v == null || v.isEmpty) {
+                                  return 'Please enter a password';
+                                }
+                                if (v.length < 6) {
+                                  return 'Password must be at least 6 characters';
+                                }
+                                return null;
+                              },
                             ),
                             const SizedBox(height: 18),
 
+                            // Confirm Password
                             _label('Confirm Password'),
                             const SizedBox(height: 8),
                             TextFormField(
@@ -215,20 +276,26 @@ class _SignUpScreenState extends State<SignUpScreen>
                               style: GoogleFonts.poppins(
                                   fontSize: 14, color: kTextDark),
                               decoration: _inputDec(
-                                hint: 'Re-enter password',
-                                icon: Icons.lock_outline,
-                                suffix: _eye(
-                                    _obscureConfirm,
-                                    () => setState(() =>
-                                        _obscureConfirm = !_obscureConfirm)),
+                                hint: 'Re-enter your password',
+                                icon: Icons.lock_outline_rounded,
+                                suffix: _eye(_obscureConfirm, () {
+                                  setState(
+                                      () => _obscureConfirm = !_obscureConfirm);
+                                }),
                               ),
-                              validator: (v) => v != _passCtrl.text
-                                  ? 'Passwords do not match'
-                                  : null,
+                              validator: (v) {
+                                if (v == null || v.isEmpty) {
+                                  return 'Please confirm your password';
+                                }
+                                if (v != _passCtrl.text) {
+                                  return 'Passwords do not match';
+                                }
+                                return null;
+                              },
                             ),
-                            const SizedBox(height: 36),
+                            const SizedBox(height: 32),
 
-                            // Create account button
+                            // Sign Up Button
                             SizedBox(
                               width: double.infinity,
                               height: 54,
@@ -242,14 +309,15 @@ class _SignUpScreenState extends State<SignUpScreen>
                                   borderRadius: BorderRadius.circular(16),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: kPrimaryColor.withValues(alpha: 0.35),
+                                      color:
+                                          kPrimaryColor.withValues(alpha: 0.4),
                                       blurRadius: 16,
                                       offset: const Offset(0, 8),
                                     ),
                                   ],
                                 ),
                                 child: ElevatedButton(
-                                  onPressed: _loading ? null : _signUp,
+                                  onPressed: (_loading || _googleLoading) ? null : _signUp,
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.transparent,
                                     shadowColor: Colors.transparent,
@@ -276,7 +344,35 @@ class _SignUpScreenState extends State<SignUpScreen>
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 28),
+                            const SizedBox(height: 24),
+
+                            // Divider
+                            Row(
+                              children: [
+                                Expanded(
+                                    child: Divider(color: Colors.grey.shade200)),
+                                Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(horizontal: 12),
+                                  child: Text(
+                                    'or continue with',
+                                    style: GoogleFonts.poppins(
+                                        color: Colors.grey.shade400, fontSize: 12),
+                                  ),
+                                ),
+                                Expanded(
+                                    child: Divider(color: Colors.grey.shade200)),
+                              ],
+                            ),
+                            const SizedBox(height: 20),
+
+                            // Google Sign-In Button
+                            GoogleSignInButton(
+                              onPressed: _googleSignIn,
+                              isLoading: _googleLoading,
+                              label: 'Sign up with Google',
+                            ),
+                            const SizedBox(height: 24),
 
                             Center(
                               child: GestureDetector(
