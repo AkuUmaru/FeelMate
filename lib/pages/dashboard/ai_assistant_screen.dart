@@ -129,6 +129,16 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
   }
 
   String _generateFallbackResponse(String userMsg) {
+    final lower = userMsg.toLowerCase();
+    if (lower.contains('siapa kamu') ||
+        lower.contains('kamu siapa') ||
+        lower.contains('who are you') ||
+        lower.contains('what are you') ||
+        lower.contains('kamu itu apa') ||
+        lower.contains('tentang kamu')) {
+      return "Halo! Aku adalah AI Companion di aplikasi FeelMate (Gemini Basic) ✨\n\nAku adalah asisten percakapan empatis yang siap merespons suasana hatimu, memantau tingkat stres, memandu teknik relaksasi (seperti latihan pernapasan box breathing), serta menyarankan hotline bantuan darurat jika kamu berada dalam krisis atau membutuhkan bantuan profesional.\n\nBagaimana perasaanmu saat ini? Ada yang ingin kamu bagi bersamaku?";
+    }
+
     final alwaysRef = _distressCount >= 3;
     const ref =
         "\n\n💙 FeelMate Note: Karena beban perasaanmu tampak cukup berat, jangan ragu untuk berbagi dengan konselor, psikolog, atau orang terdekat yang kamu percaya.";
